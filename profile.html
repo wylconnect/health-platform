@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>设置我的信息</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: white;
+      padding: 20px 16px 16px;
+      border-bottom: 1px solid #eee;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header p  { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.5; }
+
+    .section {
+      margin: 16px;
+    }
+    .section-label {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* 人群选择卡片 */
+    .group-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .group-card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px 16px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .group-card.selected {
+      border-color: #ff6b35;
+      background: #fff8f5;
+    }
+    .group-card .icon {
+      font-size: 32px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .group-card .info { flex: 1; }
+    .group-card .name {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .group-card .desc {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.5;
+    }
+    .group-card .check {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+      flex-shrink: 0;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: white;
+    }
+    .group-card.selected .check {
+      background: #ff6b35;
+      border-color: #ff6b35;
+    }
+
+    /* 底部按钮 */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      box-shadow: 0 -1px 8px rgba(0,0,0,0.08);
+    }
+    .btn-save {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      background: #ff6b35;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-save:disabled {
+      background: #ddd;
+      color: #aaa;
+    }
+
+    .spacer { height: 90px; }
+
+    /* 提示 */
+    .tip-box {
+      background: #fff8f5;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #e65100;
+      line-height: 1.6;
+      margin: 0 16px 16px;
+      border: 1px solid #ffe0cc;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>设置我的信息</h1>
+  <p>选择最符合你情况的人群类型，系统将为你生成专属健康建议。</p>
+</div>
+
+<div class="tip-box">
+  ℹ️ 你的信息仅保存在本设备上，不会上传至任何服务器。
+</div>
+
+<div class="section">
+  <div class="section-label">我属于哪类人群？</div>
+  <div class="group-cards">
+
+    <div class="group-card" id="card-elder" onclick="selectGroup('elder')">
+      <div class="icon">👴</div>
+      <div class="info">
+        <div class="name">老年人</div>
+        <div class="desc">60岁及以上，或有心脑血管、糖尿病等基础疾病的人群。对高温更敏感，需要特别关注「安静型中暑」风险。</div>
+      </div>
+      <div class="check" id="check-elder"></div>
+    </div>
+
+    <div class="group-card" id="card-outdoor" onclick="selectGroup('outdoor')">
+      <div class="icon">👷</div>
+      <div class="info">
+        <div class="name">户外工作者</div>
+        <div class="desc">快递员、外卖骑手、建筑工人、环卫工人等需要长时间在户外工作的人群。关注高温作业安全阈值与补水方案。</div>
+      </div>
+      <div class="check" id="check-outdoor"></div>
+    </div>
+
+    <div class="group-card" id="card-general" onclick="selectGroup('general')">
+      <div class="icon">🧑</div>
+      <div class="info">
+        <div class="name">普通市民</div>
+        <div class="desc">日常通勤、偶尔户外活动的普通成年人。获取日常防暑建议与出行时段推荐。</div>
+      </div>
+      <div class="check" id="check-general"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="spacer"></div>
+
+<div class="bottom-bar">
+  <button class="btn-save" id="saveBtn" onclick="save()" disabled>保存并查看建议</button>
+</div>
+
+<script>
+let selected = localStorage.getItem('userGroup') || null;
+
+// 初始化已选状态
+if (selected) {
+  applySelection(selected);
+}
+
+function selectGroup(group) {
+  selected = group;
+  applySelection(group);
+  document.getElementById('saveBtn').disabled = false;
+}
+
+function applySelection(group) {
+  ['elder', 'outdoor', 'general'].forEach(g => {
+    document.getElementById('card-' + g).classList.remove('selected');
+    document.getElementById('check-' + g).textContent = '';
+  });
+  document.getElementById('card-' + group).classList.add('selected');
+  document.getElementById('check-' + group).textContent = '✓';
+  document.getElementById('saveBtn').disabled = false;
+}
+
+function save() {
+  if (!selected) return;
+  localStorage.setItem('userGroup', selected);
+  // 清除天气缓存，强制刷新建议
+  localStorage.removeItem('weatherCache');
+  location.href = 'index.html';
+}
+</script>
+</body>
+</html>
