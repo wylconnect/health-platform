@@ -161,7 +161,8 @@
 
 <script>
 // ─── 配置区（只需改这里）───────────────────────────────
-const QWEATHER_KEY = 'd4c7aa57aaca4b4088047ab8403444a8';
+const QWEATHER_KEY = '1a03d0485ef64e24b6254c34611abc40';
+const QWEATHER_HOST = 'https://k578m37m5h.re.qweatherapi.com';
 // 成都坐标（固定，不需要用户授权位置）
 const LOCATION = '104.0657,30.6595';
 // ──────────────────────────────────────────────────────
@@ -299,14 +300,14 @@ function render(weather) {
 async function fetchWeather() {
   // 实时天气
   const nowRes = await fetch(
-    `https://devapi.qweather.com/v7/weather/now?location=${LOCATION}&key=${QWEATHER_KEY}&lang=zh`
+    `${QWEATHER_HOST}/v7/weather/now?location=${LOCATION}&key=${QWEATHER_KEY}&lang=zh`
   );
   const nowData = await nowRes.json();
   if (nowData.code !== '200') throw new Error('天气数据获取失败，code: ' + nowData.code);
 
   // 紫外线指数（逐日预报里有）
   const uvRes = await fetch(
-    `https://devapi.qweather.com/v7/indices/1d?type=5&location=${LOCATION}&key=${QWEATHER_KEY}&lang=zh`
+    `${QWEATHER_HOST}/v7/indices/1d?type=5&location=${LOCATION}&key=${QWEATHER_KEY}&lang=zh`
   );
   const uvData = await uvRes.json();
   const uvIndex = uvData.code === '200' && uvData.daily?.[0]?.level
