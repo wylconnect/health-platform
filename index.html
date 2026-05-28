@@ -172,6 +172,11 @@ function getUserGroup() {
   return localStorage.getItem('userGroup') || null;
 }
 
+// 首次进入：未选择人群则跳转到选择页
+if (!getUserGroup()) {
+  location.replace('profile.html');
+}
+
 // 风险等级判断（基于体感温度）
 function getRiskLevel(feelsLike) {
   if (feelsLike >= 41) return { level: 'danger',  icon: '🔴', text: '极端危险' };
