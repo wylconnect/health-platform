@@ -124,6 +124,33 @@
       margin: 0 16px 16px;
       border: 1px solid #ffe0cc;
     }
+
+    /* 城市选择 */
+    .city-select {
+      width: 100%;
+      background: white;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      padding: 16px 14px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23999' d='M6 8L0 2l1.4-1.4L6 5.2 10.6.6 12 2z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 40px;
+    }
+    .city-select:focus {
+      outline: none;
+      border-color: #ff6b35;
+    }
+    .city-select.has-value {
+      border-color: #ff6b35;
+      background-color: #fff8f5;
+    }
   </style>
 </head>
 <body>
@@ -135,6 +162,13 @@
 
 <div class="tip-box">
   ℹ️ 你的信息仅保存在本设备上，不会上传至任何服务器。
+</div>
+
+<div class="section">
+  <div class="section-label">我所在的城市</div>
+  <select class="city-select" id="citySelect" onchange="selectCity(this.value)">
+    <option value="">请选择四川省内城市</option>
+  </select>
 </div>
 
 <div class="section">
@@ -160,7 +194,7 @@
     </div>
 
     <div class="group-card" id="card-general" onclick="selectGroup('general')">
-      <div class="icon">🧑</div>
+      <div class="icon">🧑👩</div>
       <div class="info">
         <div class="name">普通市民</div>
         <div class="desc">日常通勤、偶尔户外活动的普通成年人。获取日常防暑建议与出行时段推荐。</div>
@@ -178,17 +212,74 @@
 </div>
 
 <script>
+// 四川省地级行政区（18 市 + 3 自治州）
+const SICHUAN_CITIES = [
+  { key: 'chengdu',    name: '成都市',   loc: '104.0657,30.6595' },
+  { key: 'zigong',     name: '自贡市',   loc: '104.7734,29.3528' },
+  { key: 'panzhihua',  name: '攀枝花市', loc: '101.7160,26.5804' },
+  { key: 'luzhou',     name: '泸州市',   loc: '105.4433,28.8891' },
+  { key: 'deyang',     name: '德阳市',   loc: '104.3979,31.1268' },
+  { key: 'mianyang',   name: '绵阳市',   loc: '104.7416,31.4640' },
+  { key: 'guangyuan',  name: '广元市',   loc: '105.8295,32.4337' },
+  { key: 'suining',    name: '遂宁市',   loc: '105.5713,30.5132' },
+  { key: 'neijiang',   name: '内江市',   loc: '105.0666,29.5871' },
+  { key: 'leshan',     name: '乐山市',   loc: '103.7613,29.5821' },
+  { key: 'nanchong',   name: '南充市',   loc: '106.0826,30.7959' },
+  { key: 'meishan',    name: '眉山市',   loc: '103.8484,30.0773' },
+  { key: 'yibin',      name: '宜宾市',   loc: '104.6308,28.7602' },
+  { key: 'guangan',    name: '广安市',   loc: '106.6333,30.4564' },
+  { key: 'dazhou',     name: '达州市',   loc: '107.5023,31.2095' },
+  { key: 'yaan',       name: '雅安市',   loc: '103.0014,29.9876' },
+  { key: 'bazhong',    name: '巴中市',   loc: '106.7536,31.8588' },
+  { key: 'ziyang',     name: '资阳市',   loc: '104.6418,30.1222' },
+  { key: 'aba',        name: '阿坝藏族羌族自治州', loc: '102.2211,31.8994' },
+  { key: 'ganzi',      name: '甘孜藏族自治州',     loc: '101.9637,30.0496' },
+  { key: 'liangshan',  name: '凉山彝族自治州',     loc: '102.2587,27.8868' },
+];
+
 let selected = localStorage.getItem('userGroup') || null;
+let selectedCity = null;
+try {
+  selectedCity = JSON.parse(localStorage.getItem('userCity') || 'null');
+} catch (e) { selectedCity = null; }
+
+// 初始化城市下拉
+(function initCitySelect() {
+  const sel = document.getElementById('citySelect');
+  SICHUAN_CITIES.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.key;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+  if (selectedCity && selectedCity.key) {
+    sel.value = selectedCity.key;
+    sel.classList.add('has-value');
+  }
+})();
 
 // 初始化已选状态
 if (selected) {
   applySelection(selected);
 }
+updateSaveBtn();
+
+function selectCity(key) {
+  const sel = document.getElementById('citySelect');
+  if (!key) {
+    selectedCity = null;
+    sel.classList.remove('has-value');
+  } else {
+    selectedCity = SICHUAN_CITIES.find(c => c.key === key) || null;
+    sel.classList.add('has-value');
+  }
+  updateSaveBtn();
+}
 
 function selectGroup(group) {
   selected = group;
   applySelection(group);
-  document.getElementById('saveBtn').disabled = false;
+  updateSaveBtn();
 }
 
 function applySelection(group) {
@@ -198,14 +289,17 @@ function applySelection(group) {
   });
   document.getElementById('card-' + group).classList.add('selected');
   document.getElementById('check-' + group).textContent = '✓';
-  document.getElementById('saveBtn').disabled = false;
+}
+
+function updateSaveBtn() {
+  document.getElementById('saveBtn').disabled = !(selected && selectedCity);
 }
 
 function save() {
-  if (!selected) return;
+  if (!selected || !selectedCity) return;
   localStorage.setItem('userGroup', selected);
-  // 清除天气缓存，强制刷新建议
-  localStorage.removeItem('weatherCache');
+  localStorage.setItem('userCity', JSON.stringify(selectedCity));
+  // 缓存按城市分别存储，切换城市/人群不需要清空（建议会基于缓存天气重新计算）
   location.href = 'index.html';
 }
 </script>
