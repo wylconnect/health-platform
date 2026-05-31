@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成都湿热健康助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* 顶部天气卡片 */
+    .weather-card {
+      background: linear-gradient(135deg, #ff6b35, #f7931e);
+      color: white;
+      padding: 28px 20px 24px;
+      text-align: center;
+    }
+    .weather-card .city { font-size: 14px; opacity: 0.85; margin-bottom: 6px; }
+    .weather-card .feels-like { font-size: 64px; font-weight: 300; line-height: 1; }
+    .weather-card .feels-like span { font-size: 24px; }
+    .weather-card .label { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .weather-metrics {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.3);
+    }
+    .metric { text-align: center; }
+    .metric .val { font-size: 22px; font-weight: 600; }
+    .metric .key { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+    /* 风险等级横幅 */
+    .risk-banner {
+      margin: 16px;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .risk-banner.danger  { background: #fff0f0; color: #d32f2f; border: 1px solid #ffcdd2; }
+    .risk-banner.warning { background: #fff8e1; color: #e65100; border: 1px solid #ffe082; }
+    .risk-banner.caution { background: #fffde7; color: #f57f17; border: 1px solid #fff176; }
+    .risk-banner.safe    { background: #f1f8e9; color: #388e3c; border: 1px solid #c5e1a5; }
+
+    /* 建议列表 */
+    .section-title {
+      font-size: 13px;
+      color: #888;
+      padding: 0 16px;
+      margin: 8px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .advice-list { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+    .advice-item {
+      background: white;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-left: 4px solid #ff6b35;
+    }
+    .advice-item.tip  { border-left-color: #42a5f5; }
+    .advice-item.warn { border-left-color: #ef5350; }
+
+    /* 底部按钮 */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      box-shadow: 0 -1px 8px rgba(0,0,0,0.08);
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary { background: #ff6b35; color: white; }
+    .btn-secondary { background: #f0f0f0; color: #555; }
+
+    /* 加载状态 */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+      font-size: 15px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #eee;
+      border-top-color: #ff6b35;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 错误状态 */
+    .error-box {
+      margin: 16px;
+      background: #fff3e0;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 14px;
+      color: #e65100;
+      line-height: 1.6;
+    }
+
+    .spacer { height: 80px; }
+
+    /* 人群标签 */
+    .group-tag {
+      display: inline-block;
+      background: rgba(255,107,53,0.12);
+      color: #ff6b35;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-bottom: 6px;
+    }
+
+    /* 更新时间 */
+    .update-time {
+      text-align: center;
+      font-size: 12px;
+      color: #bbb;
+      padding: 8px 0 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    正在获取实时气象数据…
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-secondary" onclick="location.href='profile.html'">修改我的信息</button>
+  <button class="btn btn-primary" onclick="refreshWeather()">刷新天气</button>
+</div>
+
+<script>
+// ─── 配置区（只需改这里）───────────────────────────────
+const QWEATHER_KEY = '1a03d0485ef64e24b6254c34611abc40';
+const QWEATHER_HOST = 'https://k578m37m5h.re.qweatherapi.com';
+// 默认坐标（成都），用户在 profile.html 里选择城市后会覆盖
+const DEFAULT_CITY = { key: 'chengdu', name: '成都市', loc: '104.0657,30.6595' };
+// ──────────────────────────────────────────────────────
+
+// 获取用户人群类型
+function getUserGroup() {
+  return localStorage.getItem('userGroup') || null;
+}
+
+// 获取用户所在城市
+function getUserCity() {
+  try {
+    const c = JSON.parse(localStorage.getItem('userCity') || 'null');
+    if (c && c.name && c.loc) return c;
+  } catch (e) {}
+  return null;
+}
+
+// 首次进入：未选择人群或城市则跳转到选择页
+if (!getUserGroup() || !getUserCity()) {
+  location.replace('profile.html');
+}
+
+// 风险等级判断（基于体感温度）
+function getRiskLevel(feelsLike) {
+  if (feelsLike >= 41) return { level: 'danger',  icon: '🔴', text: '极端危险' };
+  if (feelsLike >= 38) return { level: 'danger',  icon: '🔴', text: '高度危险' };
+  if (feelsLike >= 35) return { level: 'warning', icon: '🟠', text: '危险' };
+  if (feelsLike >= 32) return { level: 'caution', icon: '🟡', text: '注意' };
+  return                      { level: 'safe',    icon: '🟢', text: '较为舒适' };
+}
+
+// 紫外线等级文字
+function uvText(uv) {
+  const n = parseInt(uv);
+  if (n >= 11) return uv + ' 极强';
+  if (n >= 8)  return uv + ' 很强';
+  if (n >= 6)  return uv + ' 强';
+  if (n >= 3)  return uv + ' 中等';
+  return uv + ' 弱';
+}
+
+// 生成分人群建议
+function buildAdvices(group, feelsLike, humidity, uvIndex) {
+  const fl = parseFloat(feelsLike);
+  const hum = parseFloat(humidity);
+  const uv = parseInt(uvIndex);
+  const advices = [];
+
+  // ── 通用建议（所有人群）──
+  if (fl >= 38) {
+    advices.push({ type: 'warn', text: '当前体感温度极高，非必要不外出，外出须携带充足饮水。' });
+  }
+  if (hum >= 80) {
+    advices.push({ type: 'warn', text: `湿度 ${humidity}%，高湿度会显著降低人体散热效率，体感比实际更热。` });
+  }
+  if (uv >= 8) {
+    advices.push({ type: 'tip', text: '紫外线强烈，外出请涂抹 SPF50+ 防晒霜，佩戴遮阳帽。' });
+  }
+
+  // ── 老年人专属 ──
+  if (group === 'elder') {
+    advices.push({ type: 'tip', text: '老年人警惕「安静型中暑」：不一定大量出汗，但会出现头晕、乏力、皮肤干热，每小时自测体温，超过 37.5℃ 立即降温。' });
+    if (fl >= 35) {
+      advices.push({ type: 'warn', text: '高温时段（11:00–16:00）请留在室内，空调温度设置在 26–28℃，避免温差超过 8℃。' });
+    }
+    advices.push({ type: 'tip', text: '每小时主动补水 200ml，不要等到口渴再喝。有心脑血管疾病者，补水同时注意不要过量。' });
+  }
+
+  // ── 户外工作者专属 ──
+  if (group === 'outdoor') {
+    if (fl >= 33) {
+      advices.push({ type: 'warn', text: `体感 ${feelsLike}℃，建议每工作 45 分钟强制休息 15 分钟，转移至阴凉处。` });
+    }
+    if (fl >= 38) {
+      advices.push({ type: 'warn', text: '已达高温作业安全阈值，建议暂停高强度户外作业，联系用工方启动高温应急预案。' });
+    }
+    advices.push({ type: 'tip', text: '每小时补水 500–1000ml（含电解质），避免只喝纯水导致低钠血症。可自制淡盐水或携带运动饮料。' });
+    advices.push({ type: 'tip', text: '穿着浅色、宽松、透气的长袖衣物，比短袖更能隔热防晒。' });
+  }
+
+  // ── 普通市民专属 ──
+  if (group === 'general') {
+    if (fl >= 35) {
+      advices.push({ type: 'tip', text: '尽量将户外活动安排在 10:00 前或 17:00 后，避开最热时段。' });
+    }
+    advices.push({ type: 'tip', text: '室内开空调时，建议 26–27℃，同时保持适当通风，避免长时间密闭。' });
+    advices.push({ type: 'tip', text: '多吃含水量高的蔬果（黄瓜、西瓜、番茄），减少高油高热食物摄入。' });
+  }
+
+  // 未设置人群时的提示
+  if (!group) {
+    advices.push({ type: 'tip', text: '点击下方「修改我的信息」选择你的人群类型，获取更精准的个性化建议。' });
+  }
+
+  return advices;
+}
+
+// 渲染页面
+function render(weather) {
+  const group = getUserGroup();
+  const city = getUserCity() || DEFAULT_CITY;
+  const groupNames = { elder: '老年人', outdoor: '户外工作者', general: '普通市民' };
+
+  const feelsLike = weather.feelsLike;
+  const temp      = weather.temp;
+  const humidity  = weather.humidity;
+  const uvIndex   = weather.uvIndex || '—';
+  const windSpeed = weather.windSpeed;
+  const updateTime = weather.obsTime ? weather.obsTime.slice(11, 16) : '';
+
+  const risk    = getRiskLevel(parseFloat(feelsLike));
+  const advices = buildAdvices(group, feelsLike, humidity, uvIndex);
+
+  const adviceHTML = advices.map(a =>
+    `<div class="advice-item ${a.type}">${a.text}</div>`
+  ).join('');
+
+  const groupTagHTML = group
+    ? `<div class="group-tag">${groupNames[group]}</div>`
+    : `<div class="group-tag" style="background:#f0f0f0;color:#999">未设置人群</div>`;
+
+  document.getElementById('app').innerHTML = `
+    <div class="weather-card">
+      <div class="city">${city.name}</div>
+      <div class="feels-like">${feelsLike}<span>℃</span></div>
+      <div class="label">体感温度</div>
+      <div class="weather-metrics">
+        <div class="metric"><div class="val">${temp}℃</div><div class="key">实测气温</div></div>
+        <div class="metric"><div class="val">${humidity}%</div><div class="key">湿度</div></div>
+        <div class="metric"><div class="val">${uvText(uvIndex)}</div><div class="key">紫外线</div></div>
+        <div class="metric"><div class="val">${windSpeed}km/h</div><div class="key">风速</div></div>
+      </div>
+    </div>
+
+    <div class="risk-banner ${risk.level}">
+      ${risk.icon} 当前热风险等级：${risk.text}
+    </div>
+
+    ${groupTagHTML}
+    <div class="section-title">健康建议</div>
+    <div class="advice-list">${adviceHTML}</div>
+
+    <div class="update-time">数据更新于 ${updateTime}</div>
+    <div class="spacer"></div>
+  `;
+}
+
+// 调用和风天气 API
+async function fetchWeather() {
+  const city = getUserCity() || DEFAULT_CITY;
+  const location = city.loc;
+
+  // 实时天气
+  const nowRes = await fetch(
+    `${QWEATHER_HOST}/v7/weather/now?location=${location}&key=${QWEATHER_KEY}&lang=zh`
+  );
+  const nowData = await nowRes.json();
+  if (nowData.code !== '200') throw new Error('天气数据获取失败，code: ' + nowData.code);
+
+  // 紫外线指数（逐日预报里有）
+  const uvRes = await fetch(
+    `${QWEATHER_HOST}/v7/indices/1d?type=5&location=${location}&key=${QWEATHER_KEY}&lang=zh`
+  );
+  const uvData = await uvRes.json();
+  const uvIndex = uvData.code === '200' && uvData.daily?.[0]?.level
+    ? uvData.daily[0].level
+    : nowData.now.uvIndex || '—';
+
+  return {
+    feelsLike: nowData.now.feelsLike,
+    temp:      nowData.now.temp,
+    humidity:  nowData.now.humidity,
+    windSpeed: nowData.now.windSpeed,
+    uvIndex:   uvIndex,
+    obsTime:   nowData.now.obsTime,
+  };
+}
+
+// 主流程
+async function refreshWeather() {
+  document.getElementById('app').innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      正在获取实时气象数据…
+    </div>`;
+
+  try {
+    const city = getUserCity() || DEFAULT_CITY;
+    const cacheKey = city.key || city.loc;
+
+    // 先用缓存（10分钟内不重复请求，按城市分别缓存）
+    let allCache = {};
+    try {
+      allCache = JSON.parse(localStorage.getItem('weatherCache') || '{}');
+      // 兼容旧版单条缓存：若不是对象格式，重置为空
+      if (!allCache || typeof allCache !== 'object' || Array.isArray(allCache)) allCache = {};
+    } catch (e) { allCache = {}; }
+
+    const cached = allCache[cacheKey];
+    if (cached && cached.data && Date.now() - cached.ts < 10 * 60 * 1000) {
+      render(cached.data);
+      return;
+    }
+    const weather = await fetchWeather();
+    allCache[cacheKey] = { data: weather, ts: Date.now() };
+    localStorage.setItem('weatherCache', JSON.stringify(allCache));
+    render(weather);
+  } catch (e) {
+    document.getElementById('app').innerHTML = `
+      <div class="error-box">
+        ⚠️ 气象数据加载失败，请检查网络后重试。<br><br>
+        <small>错误信息：${e.message}</small>
+      </div>
+      <div class="spacer"></div>`;
+  }
+}
+
+// 页面加载时执行
+refreshWeather();
+</script>
+</body>
+</html>
