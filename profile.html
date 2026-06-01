@@ -125,6 +125,26 @@
       border: 1px solid #ffe0cc;
     }
 
+    /* 自动定位按钮 */
+    .btn-locate {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: 2px solid #ff6b35;
+      background: white;
+      color: #ff6b35;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-locate:disabled { border-color: #ddd; color: #aaa; cursor: default; }
+    .locate-status { font-size: 13px; color: #888; margin-bottom: 8px; min-height: 18px; }
+
     /* 城市选择 */
     .city-select {
       width: 100%;
@@ -166,8 +186,10 @@
 
 <div class="section">
   <div class="section-label">我所在的城市</div>
+  <button class="btn-locate" id="locateBtn" onclick="autoLocate()">📍 自动获取当前位置</button>
+  <div class="locate-status" id="locateStatus"></div>
   <select class="city-select" id="citySelect" onchange="selectCity(this.value)">
-    <option value="">请选择四川省内城市</option>
+    <option value="">或手动选择四川省内城市</option>
   </select>
 </div>
 
@@ -263,6 +285,46 @@ if (selected) {
   applySelection(selected);
 }
 updateSaveBtn();
+
+function autoLocate() {
+  if (!navigator.geolocation) {
+    document.getElementById('locateStatus').textContent = '当前浏览器不支持定位';
+    return;
+  }
+  const btn = document.getElementById('locateBtn');
+  const status = document.getElementById('locateStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 定位中…';
+  status.textContent = '';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      // 找最近的四川城市（欧氏距离近似）
+      let nearest = null, minDist = Infinity;
+      SICHUAN_CITIES.forEach(c => {
+        const [cLng, cLat] = c.loc.split(',').map(Number);
+        const d = (cLng - lng) ** 2 + (cLat - lat) ** 2;
+        if (d < minDist) { minDist = d; nearest = c; }
+      });
+      selectedCity = nearest;
+      const sel = document.getElementById('citySelect');
+      sel.value = nearest.key;
+      sel.classList.add('has-value');
+      status.textContent = `已定位到：${nearest.name}`;
+      btn.textContent = '📍 重新定位';
+      btn.disabled = false;
+      updateSaveBtn();
+    },
+    err => {
+      const msgs = { 1: '已拒绝定位权限，请手动选择城市', 2: '定位失败，请手动选择城市', 3: '定位超时，请手动选择城市' };
+      status.textContent = msgs[err.code] || '定位失败，请手动选择城市';
+      btn.textContent = '📍 自动获取当前位置';
+      btn.disabled = false;
+    },
+    { timeout: 10000 }
+  );
+}
 
 function selectCity(key) {
   const sel = document.getElementById('citySelect');
